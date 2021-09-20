@@ -1,7 +1,8 @@
 import pandas as pd
 import yfinance as yf
-import datetime
+import datetime, time
 # TODO: fix the change column in Account.df
+
 
 class Account:
     def __init__(self):
@@ -55,9 +56,10 @@ class Asset:
 
 def bto_asset(acct, tick, shares):
     stock = Asset()
+    tick = tick.upper()
     stock.ticker = str(tick)
     stock.value = stock.buyValue()
-    stock.shares = shares
+    stock.shares = int(shares)
     acct.asset.append(stock)
     acct.cash -= stock.value * shares
     update_acct(acct)
@@ -128,18 +130,28 @@ def update_acct(acct):
     acct.df = update_df
 
 
-phil = create_acct("Phil", 10000)
+phil = create_acct("Phil", 100000)
+elon = Asset()
+elon.ticker = "TSLA"
+elon.value = elon.newValue()
 
-bto_asset(phil, "TSLA", 5)
+bto_asset(phil, elon.ticker, 5)
 print(phil.df)
-
-stc_asset(phil, "TSLA", 5)
-print(phil.df)
-
-sto_asset(phil, "TSLA", 5)
-print(phil.df)
-
-btc_asset(phil, "TSLA", 5)
-print(phil.df)
+time.sleep(120)
+x = 60
+while x > 0:
+    new_value = elon.newValue()
+    if len(phil.asset) > 0:
+        if new_value > (phil.asset[0].value + 1):  # adjust for bid/ask spread.
+            print("selling")
+            stc_asset(phil, "TSLA", phil.asset[0].shares)
+        else:
+            print("buy 5")
+            bto_asset(phil, "TSLA", 5)
+    else:
+        bto_asset(phil, elon.ticker, 5)
+    print(phil.df)
+    x -= 1
+    time.sleep(120)
 
 
