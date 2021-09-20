@@ -1,10 +1,9 @@
-import numpy as np
 import pandas as pd
 import yfinance as yf
 import datetime
+# TODO: fix the change column in Account.df
 
 class Account:
-
     def __init__(self):
         self.name = ""
         self.cash = 0
@@ -101,9 +100,6 @@ def btc_asset(acct, tick, shares):
                 update_acct(acct)
             else:
                 print("You don't have that many shares")
-
-
-
 
 
 def create_acct(name, cash):
