@@ -29,6 +29,12 @@ class Asset:
         self.value = 0
         self.type = "Long"
         self.shares = 1
+        self.df = pd.DataFrame()
+
+    def history(self, interval):
+        ticker = yf.Ticker(self.ticker)
+        hist = ticker.history(period="1D", interval=str(interval))
+        return hist
 
     def newValue(self):
         return self.getValue(self.ticker, 0)
@@ -112,7 +118,8 @@ def create_acct(name, cash):
                  'Name': [str(acct.name)],
                  'Cash': [float(acct.cash)],
                  'value': [acct.getValuation()],
-                 'Change': [0]}
+                 'Change': [0],
+                 'Shares': [0]}
 
     acct.df = pd.DataFrame(data=data_dict)
     return acct
@@ -120,11 +127,16 @@ def create_acct(name, cash):
 
 def update_acct(acct):
     acct.valuation = acct.getValuation()
+    if len(acct.asset) > 0:
+        shares = acct.asset[0].shares
+    else:
+        shares = 0
     data_dict = {'Date-Time': datetime.datetime.now(),
                  'Name': [str(acct.name)],
                  'Cash': [float(acct.cash)],
                  'value': [acct.getValuation()],
-                 'Change': [0]}
+                 'Change': [0],
+                 'Shares': [shares]}
     df = pd.DataFrame(data=data_dict)
     update_df = pd.concat([acct.df, df])
     acct.df = update_df
@@ -133,25 +145,85 @@ def update_acct(acct):
 phil = create_acct("Phil", 100000)
 elon = Asset()
 elon.ticker = "TSLA"
-elon.value = elon.newValue()
 
-bto_asset(phil, elon.ticker, 5)
 print(phil.df)
-time.sleep(120)
-x = 60
-while x > 0:
-    new_value = elon.newValue()
-    if len(phil.asset) > 0:
-        if new_value > (phil.asset[0].value + 1):  # adjust for bid/ask spread.
-            print("selling")
+
+while datetime.datetime.utcnow().hour < 20:
+    elon.df = elon.history("5m")
+    open_last_min = elon.df.iloc[[-2]]["Open"]
+    close_last_min = elon.df.iloc[[-2]]["Close"]
+    momo = float(open_last_min) - float(close_last_min)
+    print("momo = {}".format(momo))
+
+
+    if momo > 0.5 and len(phil.asset) < 1:
+        # Don't own anything with a rising trend
+        print("No shares - rising trend")
+        bto_asset(phil, "TSLA", 5)
+        time.sleep(120)
+
+    elif momo < -0.5 and len(phil.asset) < 1:
+        # Don't own anything, falling trend
+        print("No shares - falling trend")
+        sto_asset(phil, "TSLA", 5)
+        time.sleep(120)
+
+    elif momo > 0.5 and phil.asset[0].shares > 0:
+        # Own long share and price rises.
+        print("sell - long")
+        if elon.sellValue() > phil.asset[0].value:
             stc_asset(phil, "TSLA", phil.asset[0].shares)
+            time.sleep(60)
         else:
-            print("buy 5")
-            bto_asset(phil, "TSLA", 5)
+            print("nevermind")
+            print("Their price = {}, Our price (long) = {}".format(elon.sellValue(), phil.asset[0].value))
+            time.sleep(60)
+
+    elif momo < -0.5 and phil.asset[0].shares > 0:
+        # Own long shares and prices falls.
+        print("momo down, sell and short")
+        stc_asset(phil, "TSLA", phil.asset[0].shares)
+        sto_asset(phil, "TSLA", 5)
+        time.sleep(120)
+
+    elif momo > 0.5 and phil.asset[0].shares < 0:
+        # Own short and price rises
+        print("momo up, buy and long")
+        btc_asset(phil, "TSLA", -phil.asset[0].shares)
+        bto_asset(phil, "TSLA", 5)
+        time.sleep(120)
+
+    elif momo < -0.5 and phil.asset[0].shares < 0:
+        # Own short and price falls
+        print("Buy to close")
+        if elon.buyValue() < phil.asset[0].value:
+            btc_asset(phil, "TSLA", -phil.asset[0].shares)
+            time.sleep(10)
+        else:
+            print("nevermind")
+            print("Their price = {}, Our price (short) = {}".format(elon.buyValue(), phil.asset[0].value))
+            time.sleep(120)
+
     else:
-        bto_asset(phil, elon.ticker, 5)
+        # No momentum.  Pause and hold.
+        print("No trend - Wait one minute.")
+        for asset in phil.asset:
+            if asset.type == "long" and elon.sellValue() > asset.value:
+                print("consolidating profits - long")
+                stc_asset(phil, "TSLA", phil.asset[0].shares)
+
+            elif asset.type == "short" and elon.buyValue() < asset.value:
+                print("consolidating profits - short")
+                btc_asset(phil, "TSLA", phil.asset[0].shares)
+
+        time.sleep(120)
+
+
     print(phil.df)
-    x -= 1
-    time.sleep(120)
+
+
+phil.df.to_csv("Test.csv")
+
+
 
 
